@@ -112,8 +112,7 @@ module GoogleCalendar
     def delete(feed, event)
       logger.info("-- delete st --") if logger
       auth unless @auth
-      uri = URI.parse(feed)
-      res = do_post(uri, 
+      res = do_post(feed, 
               {"X-HTTP-Method-Override" => "DELETE", 
                "Content-Type" => "application/atom+xml",
                "Content-Length" => event.length.to_s}, event)
@@ -127,8 +126,7 @@ module GoogleCalendar
     def insert(feed, event)
       logger.info("-- insert st --") if logger
       auth unless @auth
-      uri = URI.parse(feed)
-      res = do_post(uri, 
+      res = do_post(feed, 
               {"Content-Type" => "application/atom+xml",
                "Content-Length" => event.length.to_s}, event)
       logger.info("-- insert en (#{res.message}) --") if logger
@@ -141,8 +139,7 @@ module GoogleCalendar
     def update(feed, event)
       logger.info("-- update st --") if logger
       auth unless @auth
-      uri = URI.parse(feed)
-      res = do_post(uri, 
+      res = do_post(feed, 
               {"X-HTTP-Method-Override" => "PUT", 
                "Content-Type" => "application/atom+xml",
                "Content-Length" => event.length.to_s}, event)
@@ -157,12 +154,19 @@ module GoogleCalendar
       raise AuthenticationFailed
     end
     
-    def do_post(uri, header, content)
-      logger.debug("POST:" + uri.to_s) if logger
+    def do_post(feed, header, content)
       res = nil
-      try_http(uri, header, content) do |http,path,head,args|
-        cont = args[0]
-        res = http.post(path, cont, head) 
+      10.times do |count|
+        uri = URI.parse(feed)
+        break unless count==0 || uri.query
+        logger.debug("POST<#{count+1}>:#{uri}") if logger
+        try_http(uri, header, content) do |http,path,head,args|
+          cont = args[0]
+          res = http.post(path, cont, head)
+        end
+        break unless res.key?('location')
+        feed = res['location']
+        sleep(0.1)
       end
       res
     end
